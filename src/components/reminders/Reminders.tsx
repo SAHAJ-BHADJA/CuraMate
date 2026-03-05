@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
   Plus,
@@ -8,9 +8,14 @@ import {
   Check,
   X,
   Bell,
+  Pill,
 } from 'lucide-react';
 import { supabase, Reminder } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { bpMedicationReminderTemplates, toIsoAtClock } from '../../data/patientHealth';
+
+type ReminderType = Reminder['reminder_type'];
+type ReminderFrequency = Reminder['frequency'];
 
 export default function Reminders() {
   const { user } = useAuth();
@@ -20,12 +25,30 @@ export default function Reminders() {
   const [filter, setFilter] = useState<'all' | 'medicine' | 'appointment' | 'exercise'>('all');
 
   const [newReminder, setNewReminder] = useState({
-    reminder_type: 'medicine' as const,
+    reminder_type: 'medicine' as ReminderType,
     title: '',
     description: '',
     scheduled_time: '',
-    frequency: 'once' as const,
+    frequency: 'once' as ReminderFrequency,
   });
+
+  const bpMedicationReminders = useMemo<Reminder[]>(() => {
+    const baseDate = new Date();
+
+    return bpMedicationReminderTemplates.map((template, index) => ({
+      id: template.id,
+      user_id: user?.id || 'bp-template-user',
+      reminder_type: template.reminderType,
+      title: template.title,
+      description: template.description,
+      scheduled_time: toIsoAtClock(baseDate, template.scheduledClock),
+      frequency: template.frequency,
+      is_completed: false,
+      is_active: true,
+      notification_sent: false,
+      created_at: new Date(baseDate.getTime() - index * 60000).toISOString(),
+    }));
+  }, [user]);
 
   useEffect(() => {
     loadReminders();
@@ -76,6 +99,9 @@ export default function Reminders() {
   };
 
   const toggleComplete = async (reminder: Reminder) => {
+    const isTemplate = reminder.id.startsWith('BP-REM-');
+    if (isTemplate) return;
+
     const { error } = await supabase
       .from('reminders')
       .update({ is_completed: !reminder.is_completed })
@@ -87,6 +113,9 @@ export default function Reminders() {
   };
 
   const deleteReminder = async (id: string) => {
+    const isTemplate = id.startsWith('BP-REM-');
+    if (isTemplate) return;
+
     const { error } = await supabase.from('reminders').delete().eq('id', id);
 
     if (!error) {
@@ -132,15 +161,21 @@ export default function Reminders() {
     };
   };
 
+  const allReminders = useMemo(() => {
+    return [...bpMedicationReminders, ...reminders].sort(
+      (a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime()
+    );
+  }, [bpMedicationReminders, reminders]);
+
   const filteredReminders =
-    filter === 'all' ? reminders : reminders.filter((r) => r.reminder_type === filter);
+    filter === 'all' ? allReminders : allReminders.filter((reminder) => reminder.reminder_type === filter);
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Reminders</h1>
-          <p className="text-xl text-gray-600">Stay on top of your health schedule</p>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">Active Reminders</h1>
+          <p className="text-xl text-gray-600">Stay on top of your BP and daily health schedule</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -149,6 +184,18 @@ export default function Reminders() {
           <Plus className="w-6 h-6" />
           Add Reminder
         </button>
+      </div>
+
+      <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-6">
+        <h2 className="text-2xl font-bold text-red-800 mb-4 flex items-center gap-2">
+          <Pill className="w-7 h-7" />
+          BP Medication Reminders
+        </h2>
+        <ul className="space-y-2 text-red-900">
+          {bpMedicationReminderTemplates.map((template) => (
+            <li key={template.id} className="text-lg">• {template.description}</li>
+          ))}
+        </ul>
       </div>
 
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -210,6 +257,8 @@ export default function Reminders() {
         <div className="grid grid-cols-1 gap-6">
           {filteredReminders.map((reminder) => {
             const datetime = formatDateTime(reminder.scheduled_time);
+            const isTemplate = reminder.id.startsWith('BP-REM-');
+
             return (
               <div
                 key={reminder.id}
@@ -251,6 +300,11 @@ export default function Reminders() {
                           <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
                             {reminder.frequency.toUpperCase()}
                           </span>
+                          {isTemplate && (
+                            <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
+                              BP PLAN
+                            </span>
+                          )}
                           {reminder.is_completed && (
                             <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
                               COMPLETED
@@ -262,18 +316,20 @@ export default function Reminders() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => toggleComplete(reminder)}
+                          disabled={isTemplate}
                           className={`p-3 rounded-lg transition-colors ${
                             reminder.is_completed
                               ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               : 'bg-green-100 text-green-600 hover:bg-green-200'
-                          }`}
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
                           title={reminder.is_completed ? 'Mark as incomplete' : 'Mark as complete'}
                         >
                           <Check className="w-6 h-6" />
                         </button>
                         <button
                           onClick={() => deleteReminder(reminder.id)}
-                          className="p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                          disabled={isTemplate}
+                          className="p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Delete reminder"
                         >
                           <X className="w-6 h-6" />
@@ -309,7 +365,7 @@ export default function Reminders() {
                 <select
                   value={newReminder.reminder_type}
                   onChange={(e) =>
-                    setNewReminder({ ...newReminder, reminder_type: e.target.value as any })
+                    setNewReminder({ ...newReminder, reminder_type: e.target.value as ReminderType })
                   }
                   className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   required
@@ -363,7 +419,7 @@ export default function Reminders() {
                 <select
                   value={newReminder.frequency}
                   onChange={(e) =>
-                    setNewReminder({ ...newReminder, frequency: e.target.value as any })
+                    setNewReminder({ ...newReminder, frequency: e.target.value as ReminderFrequency })
                   }
                   className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   required
@@ -397,3 +453,4 @@ export default function Reminders() {
     </div>
   );
 }
+

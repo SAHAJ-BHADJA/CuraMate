@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import {
   Heart,
   Calendar,
@@ -7,12 +7,25 @@ import {
   Clock,
   TrendingUp,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Droplets,
 } from 'lucide-react';
 import { supabase, Reminder, MedicalRecord, WellnessLog } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  bpMedicationReminderTemplates,
+  calculateBmi,
+  getPatientWellnessRecommendations,
+  identifyDiabetesType,
+  mockBpLabReports,
+  toIsoAtClock,
+} from '../../data/patientHealth';
 
-export default function PatientDashboard() {
+type PatientDashboardProps = {
+  onNavigate?: (view: 'records' | 'wellness' | 'reminders') => void;
+};
+
+export default function PatientDashboard({ onNavigate }: PatientDashboardProps) {
   const { user } = useAuth();
   const [upcomingReminders, setUpcomingReminders] = useState<Reminder[]>([]);
   const [recentRecords, setRecentRecords] = useState<MedicalRecord[]>([]);
@@ -23,6 +36,28 @@ export default function PatientDashboard() {
     totalRecords: 0,
     weeklyActivities: 0,
   });
+
+  const primaryReport = mockBpLabReports[0];
+  const diabetesType = identifyDiabetesType(primaryReport);
+  const bmi = calculateBmi(primaryReport);
+  const recommendations = getPatientWellnessRecommendations(primaryReport);
+
+  const templateReminders = useMemo<Reminder[]>(() => {
+    const baseDate = new Date();
+    return bpMedicationReminderTemplates.map((template, index) => ({
+      id: `${template.id}-dashboard`,
+      user_id: user?.id || 'bp-template-user',
+      reminder_type: template.reminderType,
+      title: template.title,
+      description: template.description,
+      scheduled_time: toIsoAtClock(baseDate, template.scheduledClock),
+      frequency: template.frequency,
+      is_completed: false,
+      is_active: true,
+      notification_sent: false,
+      created_at: new Date(baseDate.getTime() - index * 60000).toISOString(),
+    }));
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -80,11 +115,15 @@ export default function PatientDashboard() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
 
-    setUpcomingReminders(reminders || []);
+    const combinedReminders = [...templateReminders, ...(reminders || [])]
+      .sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime())
+      .slice(0, 5);
+
+    setUpcomingReminders(combinedReminders);
     setRecentRecords(records || []);
     setWeeklyWellness(wellness || []);
     setStats({
-      totalReminders: totalReminders || 0,
+      totalReminders: (totalReminders || 0) + templateReminders.length,
       completedToday: completedToday || 0,
       totalRecords: totalRecords || 0,
       weeklyActivities: wellness?.length || 0,
@@ -135,17 +174,65 @@ export default function PatientDashboard() {
     <div className="p-8 space-y-8">
       <div>
         <h1 className="text-4xl font-bold text-gray-800 mb-2">Welcome Back!</h1>
-        <p className="text-xl text-gray-600">Here's your health overview for today</p>
+        <p className="text-xl text-gray-600">Here is your dynamic health monitoring summary</p>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-teal-100">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Patient Health Summary</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="rounded-lg bg-red-50 p-4 border border-red-200">
+            <p className="text-sm text-red-700 font-semibold">Blood Pressure</p>
+            <p className="text-2xl font-bold text-red-800">
+              {primaryReport.bloodPressure.systolic}/{primaryReport.bloodPressure.diastolic}
+            </p>
+          </div>
+          <div className="rounded-lg bg-yellow-50 p-4 border border-yellow-200">
+            <p className="text-sm text-yellow-700 font-semibold">Blood Glucose</p>
+            <p className="text-2xl font-bold text-yellow-800">{primaryReport.bloodGlucoseLevel} mg/dL</p>
+          </div>
+          <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
+            <p className="text-sm text-blue-700 font-semibold">Hemoglobin</p>
+            <p className="text-2xl font-bold text-blue-800">{primaryReport.hemoglobinLevel} g/dL</p>
+          </div>
+          <div className="rounded-lg bg-teal-50 p-4 border border-teal-200">
+            <p className="text-sm text-teal-700 font-semibold">BMI</p>
+            <p className="text-2xl font-bold text-teal-800">{bmi.toFixed(1)}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg bg-indigo-50 border border-indigo-200 p-4 flex items-center gap-3">
+          <Droplets className="w-6 h-6 text-indigo-700" />
+          <p className="text-lg text-indigo-900">
+            Diabetes Detection: <span className="font-bold">{diabetesType}</span>
+          </p>
+        </div>
+
+        <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-4">
+          <p className="text-sm text-red-700 font-semibold mb-2">Current Medications</p>
+          <div className="flex flex-wrap gap-2">
+            {primaryReport.currentMedications.map((medication) => (
+              <span
+                key={medication}
+                className="px-3 py-1 bg-white text-red-800 rounded-full text-sm font-medium border border-red-300"
+              >
+                {medication}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl p-6 text-white shadow-lg">
+        <button
+          onClick={() => onNavigate?.('reminders')}
+          className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl p-6 text-white shadow-lg text-left"
+        >
           <div className="flex items-center justify-between mb-4">
             <Calendar className="w-10 h-10 opacity-80" />
             <span className="text-3xl font-bold">{stats.totalReminders}</span>
           </div>
           <h3 className="text-lg font-semibold">Active Reminders</h3>
-        </div>
+        </button>
 
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
           <div className="flex items-center justify-between mb-4">
@@ -155,20 +242,56 @@ export default function PatientDashboard() {
           <h3 className="text-lg font-semibold">Completed Today</h3>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+        <button
+          onClick={() => onNavigate?.('records')}
+          className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg text-left"
+        >
           <div className="flex items-center justify-between mb-4">
             <FileText className="w-10 h-10 opacity-80" />
             <span className="text-3xl font-bold">{stats.totalRecords}</span>
           </div>
           <h3 className="text-lg font-semibold">Medical Records</h3>
-        </div>
+        </button>
 
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+        <button
+          onClick={() => onNavigate?.('wellness')}
+          className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg text-left"
+        >
           <div className="flex items-center justify-between mb-4">
             <TrendingUp className="w-10 h-10 opacity-80" />
             <span className="text-3xl font-bold">{stats.weeklyActivities}</span>
           </div>
           <h3 className="text-lg font-semibold">Weekly Activities</h3>
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Wellness and Diet Recommendations</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div>
+            <h3 className="font-semibold text-teal-700 mb-2">Diet Tips</h3>
+            <ul className="text-gray-700 space-y-1">
+              {recommendations.dietTips.map((tip) => (
+                <li key={tip}>• {tip}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-semibold text-teal-700 mb-2">Exercise</h3>
+            <ul className="text-gray-700 space-y-1">
+              {recommendations.exerciseSuggestions.map((tip) => (
+                <li key={tip}>• {tip}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-semibold text-teal-700 mb-2">Lifestyle</h3>
+            <ul className="text-gray-700 space-y-1">
+              {recommendations.lifestyleAdvice.map((tip) => (
+                <li key={tip}>• {tip}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -283,3 +406,4 @@ export default function PatientDashboard() {
     </div>
   );
 }
+

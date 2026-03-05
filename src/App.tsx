@@ -53,7 +53,7 @@ function MainApp() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <PatientDashboard />;
+        return <PatientDashboard onNavigate={(view) => setActiveView(view)} />;
       case 'records':
         return <MedicalRecords />;
       case 'reminders':

@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Activity, Plus, Apple, Heart, Smile, X } from 'lucide-react';
 import { supabase, WellnessLog } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { getPatientWellnessRecommendations, identifyDiabetesType, mockBpLabReports } from '../../data/patientHealth';
+
+type LogType = WellnessLog['log_type'];
 
 export default function Wellness() {
   const { user } = useAuth();
@@ -10,41 +13,18 @@ export default function Wellness() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'diet' | 'yoga' | 'stress' | 'exercise'>('all');
 
+  const selectedPatientReport = mockBpLabReports[0];
+  const diabetesType = identifyDiabetesType(selectedPatientReport);
+  const recommendations = getPatientWellnessRecommendations(selectedPatientReport);
+
   const [newLog, setNewLog] = useState({
-    log_type: 'diet' as const,
+    log_type: 'diet' as LogType,
     activity: '',
     duration_minutes: 0,
     notes: '',
     mood_rating: 3,
     log_date: new Date().toISOString().split('T')[0],
   });
-
-  const wellnessTips = {
-    diet: [
-      'Eat a balanced diet with plenty of fruits and vegetables',
-      'Stay hydrated - drink at least 8 glasses of water daily',
-      'Include whole grains and lean proteins in your meals',
-      'Limit processed foods and added sugars',
-    ],
-    yoga: [
-      'Start with gentle stretches for 10-15 minutes daily',
-      'Focus on breathing exercises to improve oxygen flow',
-      'Practice chair yoga if standing poses are difficult',
-      'Consistency is key - even 5 minutes daily helps',
-    ],
-    stress: [
-      'Practice deep breathing exercises when feeling anxious',
-      'Maintain social connections with friends and family',
-      'Engage in hobbies and activities you enjoy',
-      'Consider meditation or mindfulness practices',
-    ],
-    exercise: [
-      'Aim for 30 minutes of moderate activity most days',
-      'Walking is an excellent low-impact exercise',
-      'Include strength training twice a week',
-      'Always warm up before and cool down after exercise',
-    ],
-  };
 
   useEffect(() => {
     loadLogs();
@@ -133,11 +113,11 @@ export default function Wellness() {
   };
 
   const getMoodEmoji = (rating: number) => {
-    const emojis = ['😢', '😕', '😐', '🙂', '😄'];
-    return emojis[rating - 1] || '😐';
+    const emojis = [':(', ':|', ':)', ':D', 'Excellent'];
+    return emojis[rating - 1] || ':)';
   };
 
-  const filteredLogs = filter === 'all' ? logs : logs.filter((l) => l.log_type === filter);
+  const filteredLogs = filter === 'all' ? logs : logs.filter((log) => log.log_type === filter);
 
   return (
     <div className="p-8">
@@ -155,25 +135,40 @@ export default function Wellness() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-        {Object.entries(wellnessTips).map(([category, tips]) => (
-          <div key={category} className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center border-2 ${getLogColor(category)}`}>
-                {getLogIcon(category)}
-              </div>
-              <h3 className="text-xl font-bold text-gray-800 capitalize">{category} Tips</h3>
-            </div>
-            <ul className="space-y-2">
-              {tips.slice(0, 2).map((tip, idx) => (
-                <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
-                  <span className="text-teal-600 mt-1">•</span>
-                  <span>{tip}</span>
-                </li>
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border-2 border-teal-100">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Wellness Recommendations</h2>
+        <p className="text-gray-600 mb-4">
+          Personalized plan for BP patient. Diabetes status: <span className="font-semibold">{diabetesType}</span>
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div>
+            <h3 className="text-lg font-semibold text-teal-700 mb-2">Diet Tips</h3>
+            <ul className="space-y-1 text-gray-700">
+              {recommendations.dietTips.map((tip) => (
+                <li key={tip}>• {tip}</li>
               ))}
             </ul>
           </div>
-        ))}
+
+          <div>
+            <h3 className="text-lg font-semibold text-teal-700 mb-2">Exercise Suggestions</h3>
+            <ul className="space-y-1 text-gray-700">
+              {recommendations.exerciseSuggestions.map((tip) => (
+                <li key={tip}>• {tip}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-teal-700 mb-2">Lifestyle Advice</h3>
+            <ul className="space-y-1 text-gray-700">
+              {recommendations.lifestyleAdvice.map((tip) => (
+                <li key={tip}>• {tip}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -253,7 +248,7 @@ export default function Wellness() {
                   {getLogIcon(log.log_type)}
                 </div>
                 {log.mood_rating && (
-                  <span className="text-3xl">{getMoodEmoji(log.mood_rating)}</span>
+                  <span className="text-sm font-semibold text-gray-600">Mood: {getMoodEmoji(log.mood_rating)}</span>
                 )}
               </div>
 
@@ -295,7 +290,7 @@ export default function Wellness() {
                 </label>
                 <select
                   value={newLog.log_type}
-                  onChange={(e) => setNewLog({ ...newLog, log_type: e.target.value as any })}
+                  onChange={(e) => setNewLog({ ...newLog, log_type: e.target.value as LogType })}
                   className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   required
                 >
@@ -326,7 +321,7 @@ export default function Wellness() {
                   type="number"
                   value={newLog.duration_minutes}
                   onChange={(e) =>
-                    setNewLog({ ...newLog, duration_minutes: parseInt(e.target.value) || 0 })
+                    setNewLog({ ...newLog, duration_minutes: parseInt(e.target.value, 10) || 0 })
                   }
                   className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   min="0"
@@ -337,19 +332,19 @@ export default function Wellness() {
                 <label className="block text-lg font-medium text-gray-700 mb-2">
                   Mood Rating (1-5)
                 </label>
-                <div className="flex gap-4">
+                <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((rating) => (
                     <button
                       key={rating}
                       type="button"
                       onClick={() => setNewLog({ ...newLog, mood_rating: rating })}
-                      className={`flex-1 py-4 rounded-lg text-3xl transition-colors ${
+                      className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-colors ${
                         newLog.mood_rating === rating
                           ? 'bg-teal-100 border-2 border-teal-500'
                           : 'bg-gray-50 border-2 border-gray-300 hover:bg-gray-100'
                       }`}
                     >
-                      {getMoodEmoji(rating)}
+                      {rating}
                     </button>
                   ))}
                 </div>
@@ -399,3 +394,4 @@ export default function Wellness() {
     </div>
   );
 }
+

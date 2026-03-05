@@ -24,10 +24,10 @@ export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const patientMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'records', label: 'Medical Records', icon: FileText },
-    { id: 'reminders', label: 'Reminders', icon: Calendar },
+    { id: 'reminders', label: 'Active Reminders', icon: Calendar },
     { id: 'wellness', label: 'Wellness', icon: Activity },
     { id: 'care-plan', label: 'Care Plan', icon: Heart },
-    { id: 'doctors', label: 'Doctors', icon: Stethoscope },
+    { id: 'doctors', label: 'Recommended Doctors', icon: Stethoscope },
     { id: 'emergency', label: 'Emergency', icon: AlertTriangle },
     { id: 'feedback', label: 'Feedback', icon: MessageSquare },
   ];

@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
-import { FileText, Plus, Search, Filter, X } from 'lucide-react';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { FileText, Plus, Search, Filter, X, FlaskConical, User } from 'lucide-react';
 import { supabase, MedicalRecord } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { PatientLabReport, mockBpLabReports } from '../../data/patientHealth';
+
+type RecordType = MedicalRecord['record_type'];
 
 export default function MedicalRecords() {
   const { user } = useAuth();
@@ -11,9 +14,10 @@ export default function MedicalRecords() {
   const [filterType, setFilterType] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   const [newRecord, setNewRecord] = useState({
-    record_type: 'diagnosis' as const,
+    record_type: 'diagnosis' as RecordType,
     title: '',
     description: '',
     doctor_name: '',
@@ -21,6 +25,11 @@ export default function MedicalRecords() {
     record_date: new Date().toISOString().split('T')[0],
     medications: '',
   });
+
+  const selectedReport = useMemo(
+    () => mockBpLabReports.find((report) => report.reportId === selectedReportId) || null,
+    [selectedReportId]
+  );
 
   useEffect(() => {
     loadRecords();
@@ -50,15 +59,15 @@ export default function MedicalRecords() {
     let filtered = records;
 
     if (filterType !== 'all') {
-      filtered = filtered.filter((r) => r.record_type === filterType);
+      filtered = filtered.filter((record) => record.record_type === filterType);
     }
 
     if (searchTerm) {
       filtered = filtered.filter(
-        (r) =>
-          r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.doctor_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        (record) =>
+          record.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.doctor_name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -71,8 +80,8 @@ export default function MedicalRecords() {
 
     const medications = newRecord.medications
       .split(',')
-      .map((m) => m.trim())
-      .filter((m) => m);
+      .map((medication) => medication.trim())
+      .filter(Boolean);
 
     const { error } = await supabase.from('medical_records').insert({
       user_id: user.id,
@@ -130,7 +139,7 @@ export default function MedicalRecords() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Medical Records</h1>
-          <p className="text-xl text-gray-600">Manage your health history</p>
+          <p className="text-xl text-gray-600">Manage your health history and lab reports</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -140,6 +149,44 @@ export default function MedicalRecords() {
           Add Record
         </button>
       </div>
+
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <FlaskConical className="w-7 h-7 text-teal-600" />
+          BP Patient Lab Reports
+        </h2>
+        <p className="text-gray-600 mb-6">
+          Click <span className="font-semibold">Lab Result</span> to open complete structured patient report.
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {mockBpLabReports.map((report) => (
+            <div key={report.reportId} className="border-2 border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <User className="w-5 h-5 text-gray-500" />
+                <p className="font-semibold text-gray-800">{report.patientName}</p>
+              </div>
+              <p className="text-sm text-gray-600">Patient ID: {report.patientId}</p>
+              <p className="text-sm text-gray-600">Test Date: {formatDate(report.testDate)}</p>
+              <p className="text-sm text-gray-600 mb-3">
+                BP: {report.bloodPressure.systolic}/{report.bloodPressure.diastolic} mmHg
+              </p>
+              <button
+                onClick={() => setSelectedReportId(report.reportId)}
+                className="w-full px-4 py-2 bg-yellow-100 text-yellow-800 font-semibold rounded-lg hover:bg-yellow-200 transition-colors"
+              >
+                Lab Result
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {selectedReport && (
+        <LabReportDetails
+          report={selectedReport}
+          onClose={() => setSelectedReportId(null)}
+        />
+      )}
 
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -209,6 +256,14 @@ export default function MedicalRecords() {
                   {record.description && (
                     <p className="text-lg text-gray-600 mb-4">{record.description}</p>
                   )}
+                  {record.record_type === 'lab_result' && (
+                    <button
+                      onClick={() => setSelectedReportId(mockBpLabReports[0].reportId)}
+                      className="mb-4 px-4 py-2 bg-yellow-100 text-yellow-800 font-semibold rounded-lg hover:bg-yellow-200 transition-colors"
+                    >
+                      Open Lab Result
+                    </button>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {record.doctor_name && (
                       <div>
@@ -227,12 +282,12 @@ export default function MedicalRecords() {
                     <div className="mt-4">
                       <p className="text-sm font-semibold text-gray-500 mb-2">Medications</p>
                       <div className="flex flex-wrap gap-2">
-                        {record.medications.map((med, idx) => (
+                        {record.medications.map((medication, index) => (
                           <span
-                            key={idx}
+                            key={index}
                             className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium border border-green-200"
                           >
-                            {med}
+                            {medication}
                           </span>
                         ))}
                       </div>
@@ -264,7 +319,7 @@ export default function MedicalRecords() {
                 <select
                   value={newRecord.record_type}
                   onChange={(e) =>
-                    setNewRecord({ ...newRecord, record_type: e.target.value as any })
+                    setNewRecord({ ...newRecord, record_type: e.target.value as RecordType })
                   }
                   className="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   required
@@ -376,3 +431,97 @@ export default function MedicalRecords() {
     </div>
   );
 }
+
+type LabReportDetailsProps = {
+  report: PatientLabReport;
+  onClose: () => void;
+};
+
+function LabReportDetails({ report, onClose }: LabReportDetailsProps) {
+  const bmi = report.weightKg / ((report.heightCm / 100) * (report.heightCm / 100));
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-8 mb-8 border-2 border-teal-100">
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800">Complete Lab Result</h2>
+          <p className="text-gray-600">Report ID: {report.reportId}</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+        >
+          Close Report
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h3 className="font-semibold text-gray-800 mb-3">Patient Information</h3>
+          <p><span className="font-medium">Patient Name:</span> {report.patientName}</p>
+          <p><span className="font-medium">Patient ID:</span> {report.patientId}</p>
+          <p><span className="font-medium">Date of Birth:</span> {new Date(report.dateOfBirth).toLocaleDateString('en-US')}</p>
+          <p><span className="font-medium">Sex:</span> {report.sex}</p>
+          <p><span className="font-medium">Address:</span> {report.address}</p>
+          <p><span className="font-medium">Phone Number:</span> {report.phoneNumber}</p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h3 className="font-semibold text-gray-800 mb-3">Report Information</h3>
+          <p><span className="font-medium">Test Date:</span> {new Date(report.testDate).toLocaleDateString('en-US')}</p>
+          <p><span className="font-medium">Report Date:</span> {new Date(report.reportDate).toLocaleDateString('en-US')}</p>
+          <p><span className="font-medium">Physician Name:</span> {report.physicianName}</p>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 overflow-hidden mb-6">
+        <div className="bg-teal-50 px-4 py-3 border-b border-gray-200">
+          <h3 className="font-semibold text-gray-800">Lab Measurements</h3>
+        </div>
+        <div className="divide-y divide-gray-200">
+          <div className="grid grid-cols-2 px-4 py-3">
+            <span className="font-medium text-gray-700">Hemoglobin Level</span>
+            <span className="text-gray-900">{report.hemoglobinLevel} g/dL</span>
+          </div>
+          <div className="grid grid-cols-2 px-4 py-3">
+            <span className="font-medium text-gray-700">Blood Glucose Level</span>
+            <span className="text-gray-900">{report.bloodGlucoseLevel} mg/dL</span>
+          </div>
+          <div className="grid grid-cols-2 px-4 py-3">
+            <span className="font-medium text-gray-700">Blood Pressure (Systolic / Diastolic)</span>
+            <span className="text-gray-900">{report.bloodPressure.systolic}/{report.bloodPressure.diastolic} mmHg</span>
+          </div>
+          <div className="grid grid-cols-2 px-4 py-3">
+            <span className="font-medium text-gray-700">Height</span>
+            <span className="text-gray-900">{report.heightCm} cm</span>
+          </div>
+          <div className="grid grid-cols-2 px-4 py-3">
+            <span className="font-medium text-gray-700">Weight</span>
+            <span className="text-gray-900">{report.weightKg} kg</span>
+          </div>
+          <div className="grid grid-cols-2 px-4 py-3">
+            <span className="font-medium text-gray-700">BMI</span>
+            <span className="text-gray-900">{bmi.toFixed(1)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 p-4 bg-gray-50">
+        <h3 className="font-semibold text-gray-800 mb-2">Current BP/Diabetes Medications</h3>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {report.currentMedications.map((medication) => (
+            <span
+              key={medication}
+              className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium border border-red-200"
+            >
+              {medication}
+            </span>
+          ))}
+        </div>
+        <h3 className="font-semibold text-gray-800 mb-2">Medical History / Notes</h3>
+        <p className="text-gray-700">{report.medicalHistoryNotes}</p>
+      </div>
+    </div>
+  );
+}
+
