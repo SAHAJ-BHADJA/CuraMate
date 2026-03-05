@@ -15,9 +15,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   bpMedicationReminderTemplates,
   calculateBmi,
+  getMockLabReportsForUser,
   getPatientWellnessRecommendations,
   identifyDiabetesType,
-  mockBpLabReports,
   toIsoAtClock,
 } from '../../data/patientHealth';
 
@@ -26,7 +26,7 @@ type PatientDashboardProps = {
 };
 
 export default function PatientDashboard({ onNavigate }: PatientDashboardProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [upcomingReminders, setUpcomingReminders] = useState<Reminder[]>([]);
   const [recentRecords, setRecentRecords] = useState<MedicalRecord[]>([]);
   const [weeklyWellness, setWeeklyWellness] = useState<WellnessLog[]>([]);
@@ -37,7 +37,10 @@ export default function PatientDashboard({ onNavigate }: PatientDashboardProps) 
     weeklyActivities: 0,
   });
 
-  const primaryReport = mockBpLabReports[0];
+  const primaryReport = useMemo(
+    () => getMockLabReportsForUser(user?.email, profile?.full_name)[0],
+    [user?.email, profile?.full_name]
+  );
   const diabetesType = identifyDiabetesType(primaryReport);
   const bmi = calculateBmi(primaryReport);
   const recommendations = getPatientWellnessRecommendations(primaryReport);

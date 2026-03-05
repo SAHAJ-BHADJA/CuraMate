@@ -1,11 +1,13 @@
 ﻿import { useMemo, useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { Stethoscope, Search, Phone, MapPin, BadgeCheck } from 'lucide-react';
-import { getRecommendedDoctors, mockBpLabReports } from '../../data/patientHealth';
+import { getMockLabReportsForUser, getRecommendedDoctors } from '../../data/patientHealth';
 
 export default function DoctorDirectory() {
+  const { user, profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const selectedPatientReport = mockBpLabReports[0];
+  const selectedPatientReport = getMockLabReportsForUser(user?.email, profile?.full_name)[0];
   const recommendedDoctors = useMemo(
     () => getRecommendedDoctors(selectedPatientReport),
     [selectedPatientReport]
@@ -97,4 +99,5 @@ export default function DoctorDirectory() {
     </div>
   );
 }
+
 

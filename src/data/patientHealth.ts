@@ -24,6 +24,7 @@ export type PatientLabReport = {
   heightCm: number;
   weightKg: number;
   currentMedications: string[];
+  diagnosisSummary: string;
   medicalHistoryNotes: string;
 };
 
@@ -58,6 +59,7 @@ export const mockBpLabReports: PatientLabReport[] = [
     heightCm: 171,
     weightKg: 82,
     currentMedications: ['Amlodipine 5mg (Morning)', 'Losartan 50mg (After dinner)', 'Hydrochlorothiazide 12.5mg (Morning)'],
+    diagnosisSummary: 'Stage 2 Hypertension with increased cardiovascular risk. Fasting glucose in prediabetes range.',
     medicalHistoryNotes:
       'Known hypertension for 6 years. Reports occasional dizziness after high-sodium meals. Family history of Type 2 diabetes. Continue BP monitoring twice daily.',
   },
@@ -81,6 +83,7 @@ export const mockBpLabReports: PatientLabReport[] = [
     heightCm: 162,
     weightKg: 78,
     currentMedications: ['Telmisartan 40mg (Morning)', 'Amlodipine 5mg (Night)', 'Metformin 500mg (After breakfast)'],
+    diagnosisSummary: 'Stage 2 Hypertension with Type 2 Diabetes risk profile and mild metabolic syndrome indicators.',
     medicalHistoryNotes:
       'Hypertension with elevated fasting glucose. Mild fatigue and increased thirst reported. Recommend low sodium and controlled carbohydrate diet with regular walking.',
   },
@@ -104,9 +107,16 @@ export const mockBpLabReports: PatientLabReport[] = [
     heightCm: 175,
     weightKg: 69,
     currentMedications: ['Insulin glargine 10U (Night)', 'Lisinopril 10mg (Morning)'],
+    diagnosisSummary: 'Likely Type 1 Diabetes with uncontrolled hyperglycemia and borderline elevated blood pressure.',
     medicalHistoryNotes:
       'Persistently high fasting glucose with recent weight loss. Further endocrine evaluation advised. Blood pressure mildly elevated; continue home monitoring.',
   },
+];
+
+export const demoPatientCredentials = [
+  { email: 'sahajspam1@gmail.com', password: '123456' },
+  { email: 'sahajspam2@gmail.com', password: '123456' },
+  { email: 'sahajspam3@gmail.com', password: '123456' },
 ];
 
 export const recommendedDoctorsCatalog: RecommendedDoctor[] = [
@@ -272,6 +282,42 @@ export function toIsoAtClock(baseDate: Date, clock: string): string {
   return date.toISOString();
 }
 
+export function getMockLabReportsForUser(email?: string, fullName?: string): PatientLabReport[] {
+  const normalizedEmail = normalizeDemoEmail(email || '');
+
+  if (normalizedEmail === 'sahajspam1@gmail.com') {
+    return createPatientSeries({
+      patientName: fullName || 'Sahaj Bhadja',
+      patientId: 'P-SAH-1001',
+      dateOfBirth: '2001-03-18',
+      sex: 'Male',
+      address: 'Ahmedabad, Gujarat, India',
+      phoneNumber: '+91-98765-43210',
+      physicianName: 'Dr. Sarah Johnson',
+      currentMedications: ['Amlodipine 5mg (08:00 AM)', 'Losartan 50mg (07:30 PM)', 'Hydrochlorothiazide 12.5mg (08:30 AM)'],
+    });
+  }
+
+  return createPatientSeries({
+    patientName: fullName || 'CuraMate Patient',
+    patientId: 'P-GEN-1001',
+    dateOfBirth: '1985-01-10',
+    sex: 'Male',
+    address: 'Patient Address',
+    phoneNumber: '+1-000-000-0000',
+    physicianName: 'Dr. Sarah Johnson',
+    currentMedications: ['Amlodipine 5mg (08:00 AM)', 'Losartan 50mg (07:30 PM)'],
+  });
+}
+
+function normalizeDemoEmail(email: string): string {
+  const normalized = email.trim().toLowerCase();
+  if (normalized.endsWith('@gamil.com')) {
+    return normalized.replace('@gamil.com', '@gmail.com');
+  }
+  return normalized;
+}
+
 function calculateAge(dateOfBirth: string): number {
   const dob = new Date(dateOfBirth);
   const now = new Date();
@@ -283,5 +329,82 @@ function calculateAge(dateOfBirth: string): number {
   }
 
   return age;
+}
+
+function createPatientSeries(input: {
+  patientName: string;
+  patientId: string;
+  dateOfBirth: string;
+  sex: 'Male' | 'Female';
+  address: string;
+  phoneNumber: string;
+  physicianName: string;
+  currentMedications: string[];
+}): PatientLabReport[] {
+  return [
+    {
+      reportId: `${input.patientId}-LAB-01`,
+      patientName: input.patientName,
+      patientId: input.patientId,
+      dateOfBirth: input.dateOfBirth,
+      sex: input.sex,
+      address: input.address,
+      phoneNumber: input.phoneNumber,
+      testDate: '2026-01-30',
+      reportDate: '2026-01-31',
+      physicianName: input.physicianName,
+      hemoglobinLevel: 13.1,
+      bloodGlucoseLevel: 95,
+      bloodPressure: { systolic: 146, diastolic: 92 },
+      heightCm: 173,
+      weightKg: 79,
+      currentMedications: input.currentMedications,
+      diagnosisSummary: 'Hypertension with controlled glucose. Continue antihypertensive plan and monthly follow-up.',
+      medicalHistoryNotes:
+        'BP elevated on home logs. No acute symptoms. Continue low sodium diet, hydration, and adherence to medicine schedule.',
+    },
+    {
+      reportId: `${input.patientId}-LAB-02`,
+      patientName: input.patientName,
+      patientId: input.patientId,
+      dateOfBirth: input.dateOfBirth,
+      sex: input.sex,
+      address: input.address,
+      phoneNumber: input.phoneNumber,
+      testDate: '2026-02-19',
+      reportDate: '2026-02-20',
+      physicianName: input.physicianName,
+      hemoglobinLevel: 13.0,
+      bloodGlucoseLevel: 109,
+      bloodPressure: { systolic: 150, diastolic: 94 },
+      heightCm: 173,
+      weightKg: 79,
+      currentMedications: input.currentMedications,
+      diagnosisSummary: 'Stage 2 Hypertension with Prediabetes trend. Intensify lifestyle modification and monitor fasting glucose.',
+      medicalHistoryNotes:
+        'Morning BP and evening BP remain above target. Advised stricter salt control and 30-minute daily brisk walk.',
+    },
+    {
+      reportId: `${input.patientId}-LAB-03`,
+      patientName: input.patientName,
+      patientId: input.patientId,
+      dateOfBirth: input.dateOfBirth,
+      sex: input.sex,
+      address: input.address,
+      phoneNumber: input.phoneNumber,
+      testDate: '2026-03-03',
+      reportDate: '2026-03-04',
+      physicianName: input.physicianName,
+      hemoglobinLevel: 12.9,
+      bloodGlucoseLevel: 121,
+      bloodPressure: { systolic: 144, diastolic: 90 },
+      heightCm: 173,
+      weightKg: 78,
+      currentMedications: input.currentMedications,
+      diagnosisSummary: 'Persistent Hypertension with Prediabetes. Continue current medication and begin structured weight reduction plan.',
+      medicalHistoryNotes:
+        'BP improved slightly versus last visit but still high. Recommend continued medication adherence and follow-up in 4 weeks.',
+    },
+  ];
 }
 

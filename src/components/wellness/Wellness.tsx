@@ -2,18 +2,18 @@
 import { Activity, Plus, Apple, Heart, Smile, X } from 'lucide-react';
 import { supabase, WellnessLog } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { getPatientWellnessRecommendations, identifyDiabetesType, mockBpLabReports } from '../../data/patientHealth';
+import { getMockLabReportsForUser, getPatientWellnessRecommendations, identifyDiabetesType } from '../../data/patientHealth';
 
 type LogType = WellnessLog['log_type'];
 
 export default function Wellness() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [logs, setLogs] = useState<WellnessLog[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'diet' | 'yoga' | 'stress' | 'exercise'>('all');
 
-  const selectedPatientReport = mockBpLabReports[0];
+  const selectedPatientReport = getMockLabReportsForUser(user?.email, profile?.full_name)[0];
   const diabetesType = identifyDiabetesType(selectedPatientReport);
   const recommendations = getPatientWellnessRecommendations(selectedPatientReport);
 
@@ -394,4 +394,5 @@ export default function Wellness() {
     </div>
   );
 }
+
 
